@@ -19,9 +19,9 @@ Example:
 -->
 ```html
 <style>
-	fsn-map {
-	  height: 300px;
-	}
+  fsn-map {
+    height: 300px;
+  }
 </style>
 
 <fsn-map></fsn-map>
