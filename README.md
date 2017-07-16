@@ -1,4 +1,4 @@
-# \<fsn-map\>
+# FSN Map
 
 Dynamic flight sim traffic map
 
