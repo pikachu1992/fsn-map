@@ -2,20 +2,58 @@
 
 Dynamic flight sim traffic map
 
-## Install the Polymer-CLI
+Display VATSIM traffic and ATC.
 
-First, make sure you have the [Polymer CLI](https://www.npmjs.com/package/polymer-cli) installed. Then run `polymer serve` to serve your element locally.
-
-## Viewing Your Element
-
+Example:
+<!---
 ```
-$ polymer serve
-```
+<custom-element-demo>
+  <template>
+    <script src="../webcomponentsjs/webcomponents-lite.js"></script>
+    <link rel="import" href="paper-checkbox.html">
+    <style is="custom-style">
+      paper-checkbox {
+        font-family: 'Roboto', sans-serif;
+        margin: 24px;
+      }
+        
+      paper-checkbox:first-child {
+        --primary-color: #ff5722;
+      }
+      
+      paper-checkbox.styled {
+        align-self: center;
+        border: 1px solid var(--paper-green-200);
+        padding: 8px 16px;
+        --paper-checkbox-checked-color: var(--paper-green-500);
+        --paper-checkbox-checked-ink-color: var(--paper-green-500);
+        --paper-checkbox-unchecked-color: var(--paper-green-900);
+        --paper-checkbox-unchecked-ink-color: var(--paper-green-900);
+        --paper-checkbox-label-color: var(--paper-green-500);
+        --paper-checkbox-label-spacing: 0;
+        --paper-checkbox-margin: 8px 16px 8px 0;
+        --paper-checkbox-vertical-align: top;
+      }
 
-## Running Tests
-
+      paper-checkbox .subtitle {
+        display: block;
+        font-size: 0.8em;
+        margin-top: 2px;
+        max-width: 150px;
+      }
+    </style>
+    <next-code-block></next-code-block>
+  </template>
+</custom-element-demo>
 ```
-$ polymer test
+-->
+```html
+<paper-checkbox checked>Checked</paper-checkbox>
+<paper-checkbox class="styled">
+  Checkbox
+  <span class="subtitle">
+    With a longer label
+  </span>
+</paper-checkbox>
+<paper-checkbox disabled>Disabled</paper-checkbox>
 ```
-
-Your application is already set up to be tested via [web-component-tester](https://github.com/Polymer/web-component-tester). Run `polymer test` to run your application's test suite locally.
