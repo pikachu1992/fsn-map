@@ -1,0 +1,242 @@
+<link rel="import" href="bower_components/polymer/polymer.html">
+<link rel="import" href="bower_components/google-map/google-map.html">
+<link rel="import" href="bower_components/iron-ajax/iron-ajax.html">
+
+<dom-module id="fsn-map">
+  <template>
+    <style>
+      :host {
+        display: block;
+      }
+      paper-fab {
+        position: absolute;
+        bottom: 10px;
+        right: 10px;
+      }
+    </style>
+
+    <iron-ajax
+          id="ajax"
+          url="{{_getClientURL()}}"
+          handle-as="json"
+          last-response="{{clients}}"
+          on-response="handleResponse"></iron-ajax>
+
+    <iron-ajax
+          auto
+          id="firs"
+          url="https://v4p4sz5ijk.execute-api.us-east-1.amazonaws.com/anbdata/airspaces/zones/fir-list?api_key=2a877ab0-4ed2-11e7-9b2e-d3182793b831&firs=&format=json"
+          handle-as="json"
+          last-response="{{firs}}"
+          on-response="handleFirs"
+          debounce-duration="3000"></iron-ajax>
+
+    <google-map
+          additional-map-options='{"mapTypeId":"satellite"}'
+          disable-default-ui
+          fit-to-marker
+          api-key="AIzaSyDj4y39JAORYGw4rNcA1y8oVj0m8lNDje4"
+          latitude="40.0955474"
+          longitude="-3.070306"
+          zoom="4"
+          drag-events="true"
+          id="map"></google-map>
+
+  </template>
+
+  <script>
+    /**
+     * `fsn-map`
+     * Dynamic flight sim traffic map
+     *
+     * @customElement
+     * @polymer
+     * @demo demo/index.html
+     */
+    class FsnMap extends Polymer.Element {
+      static get is() { return 'fsn-map'; }
+
+      static get observers() {
+        return [
+            'view_location_change(map.latitude, map.longitude)'
+        ]
+      }
+      static get properties() {
+        return {
+          lastLatitude: {
+            type: Number,
+            value: 0
+          },
+          lastLongitude: {
+            type: Number,
+            value: 0
+          },
+          lastZoom: {
+            type: Number,
+            value: 0
+          },
+          aircraftMarkers: {
+            type: Array,
+            value: {}
+          },
+          selectedPilot: {
+            type: String,
+            value: ''
+          }
+        }
+      }
+      ready() {
+        super.ready();
+        this.$.map.addEventListener('google-map-drag', e => {this._mapUpdate(e)});
+        this.$.map.addEventListener('zoom-changed', e => {this._mapUpdate(e)});
+        this._mapUpdate(this.$.map);
+      }
+      handleFirs() {
+        var firs = this.firs;
+
+        // parse FIRs
+        for (var i = 0, len = firs.length; i < len; i++) {
+          var fir = firs[i];
+          
+          // parse geometries
+          var _coordinates = undefined;
+          var geometry = fir.geometry;
+          if (geometry.type == "Polygon") {
+            var _coordinates = geometry.coordinates[0];            
+          } else if (geometry.type == "MultiPolygon") {
+            var _coordinates = geometry.coordinates[0][1];
+          }
+          if (_coordinates != undefined) {
+            var coordinates = this._getFirCoordinates(_coordinates);
+            var firGeometry = new google.maps.Polyline({
+              path: coordinates,
+              geodesic: true,
+              strokeColor: "#FFF",
+              strokeOpacity: 0.4,
+              strokeWeight: 0.7
+            });
+            firGeometry.setMap(this.$.map.map);
+          }
+        }
+      }
+      _getFirCoordinates(_coordinates) {
+        var coordinates = [];   
+        for (var coordinatesIndex = 0, len = _coordinates.length; coordinatesIndex < len; coordinatesIndex++) {
+          coordinates.push({lat: _coordinates[coordinatesIndex][1], lng: _coordinates[coordinatesIndex][0]});
+        }
+        return coordinates;
+      }
+      handleResponse() {
+        var clients = this.clients._items;
+        for (var i = 0, len = clients.length; i < len; i++) {
+          var client = clients[i];
+          if (client.clienttype == 'PILOT') {
+            var client_x_sprite = client.heading;
+            if (client_x_sprite > 180) {
+              client_x_sprite = client_x_sprite - 180;
+            } else {
+              client_x_sprite = client_x_sprite + 180;
+            }
+            client_x_sprite = Math.round(Math.abs(client_x_sprite / 15));
+            var image = {
+              url: 'https://rawgit.com/pedro2555/pedro-toolbox/master/images/aircraft-icons.png',
+              // This marker is 20 pixels wide by 32 pixels high.
+              size: new google.maps.Size(48, 48),
+              // The origin for this image is (0, 0).
+              origin: new google.maps.Point(client_x_sprite * 48, 3 * 48),
+              // The anchor for this image is the base of the flagpole at (0, 32).
+              anchor: new google.maps.Point(24, 24)
+            };
+            var shape = {
+              coords: [1, 1, 1, 20, 18, 20, 18, 1],
+              type: 'poly'
+            };
+            var marker = this.aircraftMarkers[client.callsign + client.cid];
+            if (marker != undefined) {
+              marker.setPosition({lat: client['location'][1], lng: client['location'][0]});
+              marker.setIcon(image);
+            } else {
+              // Add the new marker
+              marker = new google.maps.Marker({
+                position: {lat: client['location'][1], lng: client['location'][0]},
+                map: this.$.map.map,
+                label: client.route,
+                icon: image,
+                title: client.callsign
+              });
+              // marker.addListener('click', function (e) {
+              //   this.selectedPilot = marker.title;
+              //   console.log(this.selectedPilot);
+              // });
+              this.aircraftMarkers[client.callsign + client.cid] = marker;
+            }
+          }
+        }
+      }
+      _mapUpdate(e) {
+        var update = false;
+        if (Math.abs(this.$.map.latitude - this.lastLatitude) > 2) {
+          this.lastLatitude = this.$.map.latitude;
+          update = true;
+        }
+        if (Math.abs(this.$.map.longitude - this.lastLongitude) > 2) {
+          this.lastLongitude = this.$.map.longitude;
+          update = true;
+        }
+        if (Math.abs(this.$.map.zoom - this.lastZoom) > 1) {
+          this.lastZoom = this.$.map.zoom;
+          update = true;
+        }
+        if (update) {
+          this.$.ajax.url = this._getClientURL();
+          this.$.ajax.generateRequest();
+        }
+      }
+      _getMapCenterLatitude() {
+        if (this.$.map.map) {
+          return this.$.map.map.getCenter().lat();
+        } else {
+          return 0;
+        }
+      }
+      _getMapCenterLongitude() {
+        if (this.$.map.map) {
+          return this.$.map.map.getCenter().lng();
+        } else {
+          return 0;
+        }
+      }
+      _getMapViewRadius() {
+        if (this.$.map.map) {
+          var bounds = this.$.map.map.getBounds();
+          var center = this.$.map.map.getCenter();
+          if (bounds && center) {
+            var ne = bounds.getNorthEast();
+            return google.maps.geometry.spherical.computeDistanceBetween(center, ne);
+          }
+          return 12000000;
+        } else {
+          return 12000000;
+        }
+      }
+      _getLatitudeFromLocation(location) {
+        return parseFloat(location.toString().split(',')[1]);
+      }
+      _getLongitudeFromLocation(location) {
+        return parseFloat(location.toString().split(',')[0]);
+      }
+      _getClientURL() {
+        try {
+          //return 'http://localhost:5000/clients?where={"location":{"$near":{"$geometry":{"type":"Point","coordinates":[long,lat]},"$maxDistance":range}}}'.replace('lat', this._getMapCenterLatitude()).replace('long', this._getMapCenterLongitude()).replace('range', parseInt(this._getMapViewRadius()) * 1.2)
+          return 'https://vatsim-status-proxy.herokuapp.com/clients?where={"location":{"$near":{"$geometry":{"type":"Point","coordinates":[long,lat]},"$maxDistance":range}}}'.replace('lat', this._getMapCenterLatitude()).replace('long', this._getMapCenterLongitude()).replace('range', parseInt(this._getMapViewRadius()) * 1.2)
+        } catch(err) {
+          console.log(err);
+          //return 'http://localhost:5000/clients'
+          return 'https://vatsim-status-proxy.herokuapp.com/clients'
+        } 
+      }
+    }
+
+    window.customElements.define(FsnMap.is, FsnMap);
+  </script>
+</dom-module>
