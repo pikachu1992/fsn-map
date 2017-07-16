@@ -11,7 +11,6 @@ Example:
   <template>
     <script src="../webcomponentsjs/webcomponents-lite.js"></script>
     <link rel="import" href="fsn-map.html">
-    
     <next-code-block></next-code-block>
   </template>
 </custom-element-demo>
