@@ -22,11 +22,13 @@
     </style>
 
     <iron-ajax
+          auto
           id="ajax"
           url="https://vatsim-status-proxy.herokuapp.com/clients"
           handle-as="json"
           last-response="{{clients}}"
-          on-response="handleResponse"></iron-ajax>
+          on-response="handleResponse"
+          loading="{{_ajaxLoading}}"></iron-ajax>
 
     <iron-ajax
           auto
@@ -38,7 +40,7 @@
           on-response="handleFirs"
           debounce-duration="3000"></iron-ajax>
 
-    <paper-progress></paper-progress>
+    <paper-progress indeterminate id="progress"></paper-progress>
     <google-map
           additional-map-options='{"mapTypeId":"satellite"}'
           disable-default-ui
@@ -66,13 +68,27 @@
 
       static get observers() {
         return [
-            'view_location_change(map.latitude, map.longitude)'
+            '_ajaxLoadingChanged(_ajaxLoading)'
         ]
       }
       static get properties() {
         return {
+          /**
+          * Viewport center position at time of last data provider call
+          */
           _lastRequestedCenter: {
             type: Object
+          },
+          /**
+          * Viewport size at time of last data provider call
+          */
+          _lastRequestedViewportDistance: {
+            type: Number
+          },
+          _ajaxLoading: {
+            type: Boolean,
+            notify: true,
+            value: false
           },
           lastLatitude: {
             type: Number,
@@ -105,6 +121,14 @@
         this.$.map.addEventListener('google-map-drag', e => {this._mapViewportUpdate(e)});
         this.$.map.addEventListener('zoom-changed', e => {this._mapViewportUpdate(e)});
       }
+      _ajaxLoadingChanged(loading) {
+        if (loading) {
+          this.$.progress.indeterminate = true;
+        } else {
+          this.$.progress.indeterminate = false;
+        }
+      }
+
       handleFirs() {
         var firs = this.firs;
 
