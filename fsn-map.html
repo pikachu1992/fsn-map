@@ -1,12 +1,18 @@
 <link rel="import" href="../polymer/polymer.html">
 <link rel="import" href="../google-map/google-map.html">
 <link rel="import" href="../iron-ajax/iron-ajax.html">
+<link rel="import" href="../paper-progress/paper-progress.html">
 
 <dom-module id="fsn-map">
   <template>
     <style>
       :host {
         display: block;
+      }
+      paper-progress {
+        display: block;
+        width: 100%;
+
       }
       paper-fab {
         position: absolute;
@@ -17,7 +23,7 @@
 
     <iron-ajax
           id="ajax"
-          url="{{_getClientURL()}}"
+          url="https://vatsim-status-proxy.herokuapp.com/clients"
           handle-as="json"
           last-response="{{clients}}"
           on-response="handleResponse"></iron-ajax>
@@ -25,12 +31,14 @@
     <iron-ajax
           auto
           id="firs"
-          url="https://v4p4sz5ijk.execute-api.us-east-1.amazonaws.com/anbdata/airspaces/zones/fir-list?api_key=2a877ab0-4ed2-11e7-9b2e-d3182793b831&firs=&format=json"
+          url="https://v4p4sz5ijk.execute-api.us-east-1.amazonaws.com/anbdata/airspaces/zones/fir-list"
+          params='{"api_key":"2a877ab0-4ed2-11e7-9b2e-d3182793b831", "firs": "", "format": "json"}'
           handle-as="json"
           last-response="{{firs}}"
           on-response="handleFirs"
           debounce-duration="3000"></iron-ajax>
 
+    <paper-progress></paper-progress>
     <google-map
           additional-map-options='{"mapTypeId":"satellite"}'
           disable-default-ui
@@ -63,6 +71,9 @@
       }
       static get properties() {
         return {
+          _lastRequestedCenter: {
+            type: Object
+          },
           lastLatitude: {
             type: Number,
             value: 0
@@ -82,14 +93,17 @@
           selectedPilot: {
             type: String,
             value: ''
+          },
+          updating: {
+            type: Boolean,
+            value: false
           }
         }
       }
       ready() {
         super.ready();
-        this.$.map.addEventListener('google-map-drag', e => {this._mapUpdate(e)});
-        this.$.map.addEventListener('zoom-changed', e => {this._mapUpdate(e)});
-        this._mapUpdate(this.$.map);
+        this.$.map.addEventListener('google-map-drag', e => {this._mapViewportUpdate(e)});
+        this.$.map.addEventListener('zoom-changed', e => {this._mapViewportUpdate(e)});
       }
       handleFirs() {
         var firs = this.firs;
@@ -173,67 +187,61 @@
           }
         }
       }
-      _mapUpdate(e) {
-        var update = false;
-        if (Math.abs(this.$.map.latitude - this.lastLatitude) > 2) {
-          this.lastLatitude = this.$.map.latitude;
-          update = true;
+      _mapDragRequiresUpdate() {
+        // check if viewport has new area to update
+        // you can do that by simply computing the distance from the current center
+        //  and the distance between the center point used for the last data request,
+        //  if that distance is bigger than viewport total distance we should force a
+        //  data request
+
+        // if map is not ready, no reason to pull data
+        if (!this.$.map.map) {
+          return false
         }
-        if (Math.abs(this.$.map.longitude - this.lastLongitude) > 2) {
-          this.lastLongitude = this.$.map.longitude;
-          update = true;
+
+        // if no last update, grab some data
+        if (!this._lastRequestedCenter) {
+          this._lastRequestedCenter = this.$.map.map.getCenter();
+          return true
         }
-        if (Math.abs(this.$.map.zoom - this.lastZoom) > 1) {
-          this.lastZoom = this.$.map.zoom;
-          update = true;
+
+        // otherwise compute map viewport geometric deslocation to update new visible areas
+        // get distance from southwest to northeast corner
+        var southwest = this.$.map.map.getBounds().getSouthWest();
+        var northeast = this.$.map.map.getBounds().getNorthEast();
+
+        // get view port distance
+        var distance = southwest && northeast ? google.maps.geometry.spherical.computeDistanceBetween(southwest, northeast) : 10000;
+        if (google.maps.geometry.spherical.computeDistanceBetween(this._lastRequestedCenter, this.$.map.map.getCenter()) > distance / 2) {
+          this._lastRequestedCenter = this.$.map.map.getCenter();
+          return true
         }
-        if (update) {
-          this.$.ajax.url = this._getClientURL();
+
+        return false
+      }
+      _mapViewportUpdate(e, force=false) {
+        if (this._mapDragRequiresUpdate() || force) {
+          this.$.ajax.params = this.computeParams();
           this.$.ajax.generateRequest();
         }
       }
-      _getMapCenterLatitude() {
-        if (this.$.map.map) {
-          return this.$.map.map.getCenter().lat();
-        } else {
-          return 0;
-        }
+      _computeWhere() {
+        // center point
+        var center = this.$.map.map.getBounds().getCenter();
+
+        // get distance from southwest to northeast corner
+        var southwest = this.$.map.map.getBounds().getSouthWest();
+        var northeast = this.$.map.map.getBounds().getNorthEast();
+
+        // get view port distance
+        var distance = southwest && northeast ? google.maps.geometry.spherical.computeDistanceBetween(southwest, northeast) : 10000;
+
+        // TODO: Parse the MongoDB query below appropriately
+        //console.log('{"location": {"$near":{ "$geometry": {"type": "Point", "coordinates": [' + center.lng() + ', ' + center.lat() + ']}, "$maxDistance": ' + Math.floor(distance) + '}}}');
+        return '{"location": {"$near":{ "$geometry": {"type": "Point", "coordinates": [' + center.lng() + ', ' + center.lat() + ']}, "$maxDistance": ' + Math.floor(distance) + '}}}'
       }
-      _getMapCenterLongitude() {
-        if (this.$.map.map) {
-          return this.$.map.map.getCenter().lng();
-        } else {
-          return 0;
-        }
-      }
-      _getMapViewRadius() {
-        if (this.$.map.map) {
-          var bounds = this.$.map.map.getBounds();
-          var center = this.$.map.map.getCenter();
-          if (bounds && center) {
-            var ne = bounds.getNorthEast();
-            return google.maps.geometry.spherical.computeDistanceBetween(center, ne);
-          }
-          return 12000000;
-        } else {
-          return 12000000;
-        }
-      }
-      _getLatitudeFromLocation(location) {
-        return parseFloat(location.toString().split(',')[1]);
-      }
-      _getLongitudeFromLocation(location) {
-        return parseFloat(location.toString().split(',')[0]);
-      }
-      _getClientURL() {
-        try {
-          //return 'http://localhost:5000/clients?where={"location":{"$near":{"$geometry":{"type":"Point","coordinates":[long,lat]},"$maxDistance":range}}}'.replace('lat', this._getMapCenterLatitude()).replace('long', this._getMapCenterLongitude()).replace('range', parseInt(this._getMapViewRadius()) * 1.2)
-          return 'https://vatsim-status-proxy.herokuapp.com/clients?where={"location":{"$near":{"$geometry":{"type":"Point","coordinates":[long,lat]},"$maxDistance":range}}}'.replace('lat', this._getMapCenterLatitude()).replace('long', this._getMapCenterLongitude()).replace('range', parseInt(this._getMapViewRadius()) * 1.2)
-        } catch(err) {
-          console.log(err);
-          //return 'http://localhost:5000/clients'
-          return 'https://vatsim-status-proxy.herokuapp.com/clients'
-        } 
+      computeParams() {
+        return {where: this._computeWhere()}
       }
     }
 
