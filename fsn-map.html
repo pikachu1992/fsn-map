@@ -262,7 +262,7 @@
 
         // TODO: Parse the MongoDB query below appropriately
         //console.log('{"location": {"$near":{ "$geometry": {"type": "Point", "coordinates": [' + center.lng() + ', ' + center.lat() + ']}, "$maxDistance": ' + Math.floor(distance) + '}}}');
-        return '{"location": {"$near":{ "$geometry": {"type": "Point", "coordinates": [' + center.lng() + ', ' + center.lat() + ']}, "$maxDistance": ' + Math.floor(distance) + '}}}'
+        return '{ "$and": [ { "clienttype": { "$eq": "PILOT" } }, { "location": {"$near":{ "$geometry": {"type": "Point", "coordinates": [' + center.lng() + ', ' + center.lat() + ']}, "$maxDistance": ' + Math.floor(distance) + '}}}]}'
       }
       computeParams() {
         return {where: this._computeWhere()}
