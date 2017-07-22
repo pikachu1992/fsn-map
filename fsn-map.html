@@ -22,13 +22,13 @@
     </style>
 
     <iron-ajax
-          auto
+          
           id="ajax"
           url="https://vatsim-status-proxy.herokuapp.com/clients"
           handle-as="json"
-          last-response="{{clients}}"
-          on-response="handleResponse"
-          loading="{{_ajaxLoading}}"></iron-ajax>
+          last-response="{{_pilots}}"
+          on-response="_handlePilotsAjaxResponse"
+          loading="{{_clientAjaxLoading}}"></iron-ajax>
 
     <iron-ajax
           auto
@@ -68,7 +68,7 @@
 
       static get observers() {
         return [
-            '_ajaxLoadingChanged(_ajaxLoading)'
+            '_clientAjaxLoadingChanged(_clientAjaxLoading)'
         ]
       }
       static get properties() {
@@ -85,7 +85,15 @@
           _lastRequestedViewportDistance: {
             type: Number
           },
-          _ajaxLoading: {
+          _clientTimerTickCounter: {
+            type: Number,
+            value: 1000
+          },
+          _clientTimerLimit: {
+            type: Number,
+            value: 1000
+          },
+          _clientAjaxLoading: {
             type: Boolean,
             notify: true,
             value: false
@@ -102,7 +110,7 @@
             type: Number,
             value: 0
           },
-          aircraftMarkers: {
+          _aircraftMarkers: {
             type: Array,
             value: {}
           },
@@ -118,17 +126,50 @@
       }
       ready() {
         super.ready();
+
+        // map events binding
         this.$.map.addEventListener('google-map-drag', e => {this._mapViewportUpdate(e)});
         this.$.map.addEventListener('zoom-changed', e => {this._mapViewportUpdate(e)});
+
+        // schedule update
+        window.requestAnimationFrame(this._clientTimerTick.bind(this));
       }
-      _ajaxLoadingChanged(loading) {
+      _clientTimerTick() {
+        // every 100ms
+        if (this._clientTimerTickCounter % 100 == 0) {
+
+          if (!this.$.map.map) {
+            this._clientTimerTickCounter = 0;
+          }
+
+          if (this._clientAjaxLoading) {
+            this._clientTimerTickCounter = 0;
+          }
+
+          if (this._clientTimerTickCounter >= this._clientTimerLimit || this._mapDragRequiresUpdate()) {
+            this._clientTimerTickCounter = 0;
+            if (this.$.ajax.lastRequest) {
+              this.$.ajax.lastRequest.abort();
+            }
+
+            // do ajax request
+            // console.log("request");
+            this.$.ajax.params = this.computeParams();
+            this.$.ajax.generateRequest();
+          }
+        }
+
+        // console.log("this._clientTimerTickCounter++;");
+        this._clientTimerTickCounter++;
+        window.requestAnimationFrame(this._clientTimerTick.bind(this));
+      }
+      _clientAjaxLoadingChanged(loading) {
         if (loading) {
           this.$.progress.indeterminate = true;
         } else {
           this.$.progress.indeterminate = false;
         }
       }
-
       handleFirs() {
         var firs = this.firs;
 
@@ -164,64 +205,73 @@
         }
         return coordinates;
       }
-      handleResponse() {
-        var clients = this.clients._items;
-        for (var i = 0, len = clients.length; i < len; i++) {
-          var client = clients[i];
-          if (client.clienttype == 'PILOT') {
-            var client_x_sprite = client.heading;
-            if (client_x_sprite > 180) {
-              client_x_sprite = client_x_sprite - 180;
-            } else {
-              client_x_sprite = client_x_sprite + 180;
-            }
-            client_x_sprite = Math.round(Math.abs(client_x_sprite / 15));
-            var image = {
-              url: 'https://rawgit.com/pedro2555/pedro-toolbox/master/images/aircraft-icons.png',
-              // This marker is 20 pixels wide by 32 pixels high.
-              size: new google.maps.Size(23, 23),
-              // The origin for this image is (0, 0).
-              origin: new google.maps.Point(client_x_sprite * 48, 3 * 48),
-              // The anchor for this image is the base of the flagpole at (0, 32).
-              anchor: new google.maps.Point(24, 24)
-            };
-            var shape = {
-              coords: [1, 1, 1, 20, 18, 20, 18, 1],
-              type: 'poly'
-            };
-            var marker = this.aircraftMarkers[client.callsign + client.cid];
-            if (marker != undefined) {
-              marker.setPosition({lat: client['location'][1], lng: client['location'][0]});
-              marker.setIcon(image);
-            } else {
-              // Add the new marker
-              marker = new google.maps.Marker({
-                position: {lat: client['location'][1], lng: client['location'][0]},
-                map: this.$.map.map,
-                label: client.route,
-                icon: image,
-                title: client.callsign
-              });
-              // marker.addListener('click', function (e) {
-              //   this.selectedPilot = marker.title;
-              //   console.log(this.selectedPilot);
-              // });
-              this.aircraftMarkers[client.callsign + client.cid] = marker;
-            }
+      _handlePilotsAjaxResponse() {
+        if (this._pilots == undefined) {
+          return
+        }
+
+        console.log(this._pilots._items.length + " pilot(s)");
+
+        for (var pilotIndex = 0, len = this._pilots._items.length; pilotIndex < len; pilotIndex++) {
+          var pilot = this._pilots._items[pilotIndex];
+          // console.log("pilot #" + pilotIndex);
+
+          // update markers
+          var marker = this._aircraftMarkers[pilot.callsign + pilot.cid];
+          if (marker != undefined) {
+            // update existing marker
+              marker.setPosition({lat: pilot['location'][1], lng: pilot['location'][0]});
+              marker.setIcon(this._getClientMarkerIcon(pilot));
+              // console.log("update " + marker);
+          } else {
+            // create and save a new marker
+            marker = new google.maps.Marker({
+              position: {lat: pilot['location'][1], lng: pilot['location'][0]},
+              map: this.$.map.map,
+              label: pilot.route,
+              icon: this._getClientMarkerIcon(pilot),
+              title: pilot.callsign + ' ' + pilot.realname
+            });
+            this._aircraftMarkers[pilot.callsign + pilot.cid] = marker;
+            // console.log("create " + marker);
           }
         }
       }
+      _getClientMarkerIcon(client) {
+        // determine x coordinate in aircraft sprite image
+        var client_x_sprite = client.heading;
+        if (client_x_sprite > 180) {
+          client_x_sprite = client_x_sprite - 180;
+        } else {
+          client_x_sprite = client_x_sprite + 180;
+        }
+        client_x_sprite = Math.round(Math.abs(client_x_sprite / 15));
+
+        // return actual image
+        return {
+          url: 'https://rawgit.com/pedro2555/pedro-toolbox/master/images/aircraft-icons.png',
+          // This marker is 20 pixels wide by 32 pixels high.
+          size: new google.maps.Size(23, 23),
+          // The origin for this image is (0, 0).
+          origin: new google.maps.Point(client_x_sprite * 48, 3 * 48),
+          // The anchor for this image is the base of the flagpole at (0, 32).
+          anchor: new google.maps.Point(11.5, 11.5)
+        };
+      }
       _mapDragRequiresUpdate() {
-        // check if viewport has new area to update
-        // you can do that by simply computing the distance from the current center
-        //  and the distance between the center point used for the last data request,
-        //  if that distance is bigger than viewport total distance we should force a
-        //  data request
+
+        /*
+        * Early exit conditions
+        */
 
         // if map is not ready, no reason to pull data
-        if (!this.$.map.map) {
+        if (this.$.map.map == null) {
           return false
         }
+
+        /*
+        * Verified conditions
+        */
 
         // if no last update, grab some data
         if (!this._lastRequestedCenter) {
@@ -229,27 +279,48 @@
           return true
         }
 
-        // otherwise compute map viewport geometric deslocation to update new visible areas
-        // get distance from southwest to northeast corner
+        // map viewport deslocation requires new data
         var southwest = this.$.map.map.getBounds().getSouthWest();
         var northeast = this.$.map.map.getBounds().getNorthEast();
-
-        // get view port distance
         var distance = southwest && northeast ? google.maps.geometry.spherical.computeDistanceBetween(southwest, northeast) : 10000;
         if (google.maps.geometry.spherical.computeDistanceBetween(this._lastRequestedCenter, this.$.map.map.getCenter()) > distance / 2) {
           this._lastRequestedCenter = this.$.map.map.getCenter();
           return true
         }
 
+        /*
+        * No matching condition
+        */
         return false
       }
       _mapViewportUpdate(e, force=false) {
-        if (this._mapDragRequiresUpdate() || force) {
-          this.$.ajax.params = this.computeParams();
+        this.$.ajax.params = this.computeParams();
+        this._lastRequestTryCounter++;
+
+        if (force) {
           this.$.ajax.generateRequest();
         }
+
+        // if (this._lastRequestTryCounter <= 5000) {
+        //   console.log("(this._lastRequestTryCounter <= 5000000) " + this._lastRequestTryCounter);
+        //   return
+        // }
+
+        if (!this._mapDragRequiresUpdate()) {
+          return
+        }
+
+        this.$.ajax.generateRequest();
+      }
+      _calculateClientMovement(client) {
+
       }
       _computeWhere() {
+
+        if (!this.$.map.map.getBounds()) {
+          return '{"clienttype": {"$eq": "PILOT"}}';
+        }
+
         // center point
         var center = this.$.map.map.getBounds().getCenter();
 
@@ -264,14 +335,15 @@
         //console.log('{"location": {"$near":{ "$geometry": {"type": "Point", "coordinates": [' + center.lng() + ', ' + center.lat() + ']}, "$maxDistance": ' + Math.floor(distance) + '}}}');
         return  ['{ "$and": [ ',
                 [
-                  '{ "clienttype": { "$eq": "PILOT" } }',
-                  '{ "location": {"$near":{ "$geometry": {"type": "Point", "coordinates": [' + center.lng() + ', ' + center.lat() + ']}, "$maxDistance": ' + Math.floor(distance) + '}}}',
+                  '{"clienttype": {"$eq": "PILOT"}}',
+                  '{"location": {"$near":{"$geometry": {"type": "Point", "coordinates": [' + center.lng() + ', ' + center.lat() + ']}, "$maxDistance": ' + Math.floor(distance) + '}}}',
                   // TODO: append params here
+                  //'{"callsign": {"$regex": "^(TAP|TSZ).*$", "$options": "im"}}',
                 ].join(','),
                 '] }'].join('');
 }
       computeParams() {
-        return {where: this._computeWhere(), projection: '{ "callsign": 1, "cid": 1, "location": 1, "heading": 1, "groundspeed": 1, "altitude": 1 }'}
+        return {where: this._computeWhere(), projection: '{ "callsign": 1, "cid": 1, "realname": 1, "location": 1, "heading": 1, "groundspeed": 1, "altitude": 1 }'}
       }
     }
 
