@@ -262,10 +262,16 @@
 
         // TODO: Parse the MongoDB query below appropriately
         //console.log('{"location": {"$near":{ "$geometry": {"type": "Point", "coordinates": [' + center.lng() + ', ' + center.lat() + ']}, "$maxDistance": ' + Math.floor(distance) + '}}}');
-        return '{ "$and": [ { "clienttype": { "$eq": "PILOT" } }, { "location": {"$near":{ "$geometry": {"type": "Point", "coordinates": [' + center.lng() + ', ' + center.lat() + ']}, "$maxDistance": ' + Math.floor(distance) + '}}}]}'
-      }
+        return  ['{ "$and": [ ',
+                [
+                  '{ "clienttype": { "$eq": "PILOT" } }',
+                  '{ "location": {"$near":{ "$geometry": {"type": "Point", "coordinates": [' + center.lng() + ', ' + center.lat() + ']}, "$maxDistance": ' + Math.floor(distance) + '}}}',
+                  // TODO: append params here
+                ].join(','),
+                '] }'].join('');
+}
       computeParams() {
-        return {where: this._computeWhere()}
+        return {where: this._computeWhere(), projection: '{ "callsign": 1, "cid": 1, "location": 1, "heading": 1, "groundspeed": 1, "altitude": 1 }'}
       }
     }
 
