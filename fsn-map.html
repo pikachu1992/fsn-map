@@ -27,7 +27,7 @@
           url="https://vatsim-status-proxy.herokuapp.com/clients"
           handle-as="json"
           last-response="{{_pilots}}"
-          on-response="_handlePilotsAjaxResponse"
+          on-response="_plotPilotMapMarkers"
           loading="{{_clientAjaxLoading}}"></iron-ajax>
 
     <iron-ajax
@@ -85,6 +85,10 @@
           _lastRequestedViewportDistance: {
             type: Number
           },
+          _pilotPlotTickCounter: {
+            type: Number,
+            value: 1
+          },
           _clientTimerTickCounter: {
             type: Number,
             value: 1000
@@ -133,8 +137,20 @@
 
         // schedule update
         window.requestAnimationFrame(this._clientTimerTick.bind(this));
+        window.requestAnimationFrame(this._pilotPlotTick.bind(this));
+      }
+      _pilotPlotTick() {
+        // every second
+        if (this._pilotPlotTickCounter % 100 == 0) {
+          this._pilotPlotTickCounter = 1;
+          this._plotPilotMapMarkers();
+        }
+        this._pilotPlotTickCounter++;
+        window.requestAnimationFrame(this._pilotPlotTick.bind(this));
       }
       _clientTimerTick() {
+
+
         // every 100ms
         if (this._clientTimerTickCounter % 100 == 0) {
 
@@ -204,38 +220,6 @@
           coordinates.push({lat: _coordinates[coordinatesIndex][1], lng: _coordinates[coordinatesIndex][0]});
         }
         return coordinates;
-      }
-      _handlePilotsAjaxResponse() {
-        if (this._pilots == undefined) {
-          return
-        }
-
-        console.log(this._pilots._items.length + " pilot(s)");
-
-        for (var pilotIndex = 0, len = this._pilots._items.length; pilotIndex < len; pilotIndex++) {
-          var pilot = this._pilots._items[pilotIndex];
-          // console.log("pilot #" + pilotIndex);
-
-          // update markers
-          var marker = this._aircraftMarkers[pilot.callsign + pilot.cid];
-          if (marker != undefined) {
-            // update existing marker
-              marker.setPosition({lat: pilot['location'][1], lng: pilot['location'][0]});
-              marker.setIcon(this._getClientMarkerIcon(pilot));
-              // console.log("update " + marker);
-          } else {
-            // create and save a new marker
-            marker = new google.maps.Marker({
-              position: {lat: pilot['location'][1], lng: pilot['location'][0]},
-              map: this.$.map.map,
-              label: pilot.route,
-              icon: this._getClientMarkerIcon(pilot),
-              title: pilot.callsign + ' ' + pilot.realname
-            });
-            this._aircraftMarkers[pilot.callsign + pilot.cid] = marker;
-            // console.log("create " + marker);
-          }
-        }
       }
       _getClientMarkerIcon(client) {
         // determine x coordinate in aircraft sprite image
@@ -312,8 +296,74 @@
 
         this.$.ajax.generateRequest();
       }
+      static toRad(degree) {
+         return degree * Math.PI / 180;
+      }
+      static toDeg(radian) {
+         return radian * 180 / Math.PI;
+      }
       _calculateClientMovement(client) {
+        // calculate traveled distance in nautical miles
+        // get time traveled
+        var now = new Date();
+        var updated = new Date(Date.parse(client['_updated']));
+        if (updated > now) {
+          updated.setDate(updated.getDate() + 1);
+        }
+        var hoursTraveled = (now - updated)/36e5;
+        var kmTraveled = (client.groundspeed * hoursTraveled) * 1.609344;
 
+        // calculate new location
+        var currentLocation = new google.maps.LatLng(client['location'][1], client['location'][0]);
+
+        kmTraveled = kmTraveled / 6371;  
+        var heading = FsnMap.toRad(client.heading);
+
+        var lat1 = FsnMap.toRad(currentLocation.lat()), lon1 = FsnMap.toRad(currentLocation.lng());
+
+        var lat2 = Math.asin(Math.sin(lat1) * Math.cos(kmTraveled) + 
+                            Math.cos(lat1) * Math.sin(kmTraveled) * Math.cos(heading));
+
+        var lon2 = lon1 + Math.atan2(Math.sin(heading) * Math.sin(kmTraveled) *
+                                     Math.cos(lat1), 
+                                     Math.cos(kmTraveled) - Math.sin(lat1) *
+                                     Math.sin(lat2));
+
+        client['location'][0] = FsnMap.toDeg(lon2);
+        client['location'][1] = FsnMap.toDeg(lat2);
+
+        return client
+      }
+      _plotPilotMapMarkers() {
+        if (this._pilots == undefined) {
+          return
+        }
+
+        for (var pilotIndex = 0, len = this._pilots._items.length; pilotIndex < len; pilotIndex++) {
+          var pilot = this._pilots._items[pilotIndex];
+          // console.log("pilot #" + pilotIndex);
+
+          // update markers
+          var marker = this._aircraftMarkers[pilot.callsign + pilot.cid];
+          var pilot = this._calculateClientMovement(pilot);
+          if (marker != undefined) {
+            // update existing marker
+              marker.setPosition({lat: pilot['location'][1], lng: pilot['location'][0]});
+              marker.setIcon(this._getClientMarkerIcon(pilot));
+              // console.log("update " + marker);
+          } else {
+            // create and save a new marker
+            marker = new google.maps.Marker({
+              position: {lat: pilot['location'][1], lng: pilot['location'][0]},
+              map: this.$.map.map,
+              label: pilot.route,
+              icon: this._getClientMarkerIcon(pilot),
+              title: pilot.callsign + ' ' + pilot.realname
+            });
+            this._aircraftMarkers[pilot.callsign + pilot.cid] = marker;
+            // console.log("create " + marker);
+          }
+        }
       }
       _computeWhere() {
 
@@ -343,7 +393,7 @@
                 '] }'].join('');
 }
       computeParams() {
-        return {where: this._computeWhere(), projection: '{ "callsign": 1, "cid": 1, "realname": 1, "location": 1, "heading": 1, "groundspeed": 1, "altitude": 1 }'}
+        return {where: this._computeWhere(), projection: '{"_updated": 1, "_created": 1, "callsign": 1, "cid": 1, "realname": 1, "location": 1, "heading": 1, "groundspeed": 1, "altitude": 1}'}
       }
     }
 
