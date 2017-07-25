@@ -95,7 +95,7 @@
           },
           _clientTimerLimit: {
             type: Number,
-            value: 1000
+            value: 10000
           },
           _clientAjaxLoading: {
             type: Boolean,
@@ -141,7 +141,7 @@
       }
       _pilotPlotTick() {
         // every second
-        if (this._pilotPlotTickCounter % 100 == 0) {
+        if (this._pilotPlotTickCounter % 1000 == 0) {
           this._pilotPlotTickCounter = 1;
           this._plotPilotMapMarkers();
         }
