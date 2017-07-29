@@ -22,13 +22,20 @@
     </style>
 
     <iron-ajax
-          
           id="ajax"
           url="https://vatsim-status-proxy.herokuapp.com/clients"
           handle-as="json"
           last-response="{{_pilots}}"
           on-response="_plotPilotMapMarkers"
           loading="{{_clientAjaxLoading}}"></iron-ajax>
+
+    <iron-ajax
+          id="atc"
+          url="https://vatsim-status-proxy.herokuapp.com/clients"
+          handle-as="json"
+          last-response="{{_atcs}}"
+          on-response="_handleAtcResponse"
+          loading="{{_atcAjaxLoading}}"></iron-ajax>
 
     <iron-ajax
           auto
@@ -102,6 +109,11 @@
             notify: true,
             value: false
           },
+          _atcAjaxLoading: {
+            type: Boolean,
+            notify: true,
+            value: false
+          },
           lastLatitude: {
             type: Number,
             value: 0
@@ -115,6 +127,10 @@
             value: 0
           },
           _aircraftMarkers: {
+            type: Array,
+            value: {}
+          },
+          _airportMarkers: {
             type: Array,
             value: {}
           },
@@ -170,8 +186,11 @@
 
             // do ajax request
             // console.log("request");
-            this.$.ajax.params = this.computeParams();
+            this.$.ajax.params = this.computeParams('PILOT');
             this.$.ajax.generateRequest();
+
+            this.$.atc.params = this.computeParams('ATC');
+            this.$.atc.generateRequest();
           }
         }
 
@@ -278,11 +297,13 @@
         return false
       }
       _mapViewportUpdate(e, force=false) {
-        this.$.ajax.params = this.computeParams();
+        this.$.ajax.params = this.computeParams('PILOT');
+        this.$.atc.params = this.computeParams('ATC');
         this._lastRequestTryCounter++;
 
         if (force) {
           this.$.ajax.generateRequest();
+          this.$.atc.generateRequest();
         }
 
         // if (this._lastRequestTryCounter <= 5000) {
@@ -295,6 +316,8 @@
         }
 
         this.$.ajax.generateRequest();
+        this.$.atc.generateRequest();
+
       }
       static toRad(degree) {
          return degree * Math.PI / 180;
@@ -368,7 +391,38 @@
           }
         }
       }
-      _computeWhere() {
+      _handleAtcResponse() {
+        if (this._atcs == undefined) {
+          console.log('returning');
+          return
+        }
+
+        for (var atcIndex = 0, len = this._atcs._items.length; atcIndex < len; atcIndex++) {
+          console.log('ok');
+          var atc = this._atcs._items[atcIndex];
+          // console.log("atc #" + atcIndex);
+
+          var iconImage;
+          if (atc.callsign.search('\_TWR') > -1) {
+            // update markers
+            var marker = this._aircraftMarkers[atc.callsign + atc.cid];
+            if (marker != undefined) {
+              // update existing marker
+            } else {
+              // create and save a new marker
+              marker = new google.maps.Marker({
+                position: {lat: atc['location'][1], lng: atc['location'][0]},
+                map: this.$.map.map,
+                icon: '../airport-icon.png',
+                title: atc.callsign + ' ' + atc.realname
+              });
+              this._aircraftMarkers[atc.callsign + atc.cid] = marker;
+              // console.log("create " + marker);
+            }
+          }
+        }
+      }
+      _computeWhere(clientType) {
 
         if (!this.$.map.map.getBounds()) {
           return '{"clienttype": {"$eq": "PILOT"}}';
@@ -388,15 +442,17 @@
         //console.log('{"location": {"$near":{ "$geometry": {"type": "Point", "coordinates": [' + center.lng() + ', ' + center.lat() + ']}, "$maxDistance": ' + Math.floor(distance) + '}}}');
         return  ['{ "$and": [ ',
                 [
-                  '{"clienttype": {"$eq": "PILOT"}}',
+                  '{"clienttype": {"$eq": "' + clientType + '"}}',
                   '{"location": {"$near":{"$geometry": {"type": "Point", "coordinates": [' + center.lng() + ', ' + center.lat() + ']}, "$maxDistance": ' + Math.floor(distance) + '}}}',
                   // TODO: append params here
                   //'{"callsign": {"$regex": "^(TAP|TSZ).*$", "$options": "im"}}',
                 ].join(','),
                 '] }'].join('');
 }
-      computeParams() {
-        return {where: this._computeWhere(), projection: '{"_updated": 1, "_created": 1, "callsign": 1, "cid": 1, "realname": 1, "location": 1, "heading": 1, "groundspeed": 1, "altitude": 1}'}
+      computeParams(clientType) {
+        return {
+          where: this._computeWhere(clientType),
+          projection: '{"_updated": 1, "_created": 1, "callsign": 1, "cid": 1, "clienttype": 1, "realname": 1, "location": 1, "heading": 1, "groundspeed": 1, "altitude": 1}'}
       }
     }
 
