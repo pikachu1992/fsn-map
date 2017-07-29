@@ -313,24 +313,27 @@
         var hoursTraveled = (now - updated)/36e5;
         var kmTraveled = (client.groundspeed * hoursTraveled) * 1.609344;
 
-        // calculate new location
-        var currentLocation = new google.maps.LatLng(client['location'][1], client['location'][0]);
+        // keep conservative
+        if (kmTraveled > 5) {
+          // calculate new location
+          var currentLocation = new google.maps.LatLng(client['location'][1], client['location'][0]);
 
-        kmTraveled = kmTraveled / 6371;  
-        var heading = FsnMap.toRad(client.heading);
+          kmTraveled = kmTraveled / 6371;  
+          var heading = FsnMap.toRad(client.heading);
 
-        var lat1 = FsnMap.toRad(currentLocation.lat()), lon1 = FsnMap.toRad(currentLocation.lng());
+          var lat1 = FsnMap.toRad(currentLocation.lat()), lon1 = FsnMap.toRad(currentLocation.lng());
 
-        var lat2 = Math.asin(Math.sin(lat1) * Math.cos(kmTraveled) + 
-                            Math.cos(lat1) * Math.sin(kmTraveled) * Math.cos(heading));
+          var lat2 = Math.asin(Math.sin(lat1) * Math.cos(kmTraveled) + 
+                              Math.cos(lat1) * Math.sin(kmTraveled) * Math.cos(heading));
 
-        var lon2 = lon1 + Math.atan2(Math.sin(heading) * Math.sin(kmTraveled) *
-                                     Math.cos(lat1), 
-                                     Math.cos(kmTraveled) - Math.sin(lat1) *
-                                     Math.sin(lat2));
+          var lon2 = lon1 + Math.atan2(Math.sin(heading) * Math.sin(kmTraveled) *
+                                       Math.cos(lat1), 
+                                       Math.cos(kmTraveled) - Math.sin(lat1) *
+                                       Math.sin(lat2));
 
-        client['location'][0] = FsnMap.toDeg(lon2);
-        client['location'][1] = FsnMap.toDeg(lat2);
+          client['location'][0] = FsnMap.toDeg(lon2);
+          client['location'][1] = FsnMap.toDeg(lat2);
+        }
 
         return client
       }
