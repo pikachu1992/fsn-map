@@ -223,7 +223,7 @@
       }
       _getClientMarkerIcon(client) {
         // determine x coordinate in aircraft sprite image
-        var client_x_sprite = client.heading;
+        var client_x_sprite = parseInt(client.heading);
         if (client_x_sprite > 180) {
           client_x_sprite = client_x_sprite - 180;
         } else {
@@ -233,7 +233,7 @@
 
         // return actual image
         return {
-          url: 'https://rawgit.com/pedro2555/pedro-toolbox/master/images/aircraft-icons.png',
+          url: '../aircraft-yellow-icons.png',
           // This marker is 20 pixels wide by 32 pixels high.
           size: new google.maps.Size(23, 23),
           // The origin for this image is (0, 0).
