@@ -157,7 +157,7 @@
       }
       _pilotPlotTick() {
         // every second
-        if (this._pilotPlotTickCounter % 1000 == 0) {
+        if (this._pilotPlotTickCounter % 100 == 0) {
           this._pilotPlotTickCounter = 1;
           this._plotPilotMapMarkers();
         }
@@ -211,12 +211,12 @@
         // parse FIRs
         for (var i = 0, len = firs.length; i < len; i++) {
           var fir = firs[i];
-          
+
           // parse geometries
           var _coordinates = undefined;
           var geometry = fir.geometry;
           if (geometry.type == "Polygon") {
-            var _coordinates = geometry.coordinates[0];            
+            var _coordinates = geometry.coordinates[0];
           } else if (geometry.type == "MultiPolygon") {
             var _coordinates = geometry.coordinates[0][1];
           }
@@ -234,13 +234,13 @@
         }
       }
       _getFirCoordinates(_coordinates) {
-        var coordinates = [];   
+        var coordinates = [];
         for (var coordinatesIndex = 0, len = _coordinates.length; coordinatesIndex < len; coordinatesIndex++) {
           coordinates.push({lat: _coordinates[coordinatesIndex][1], lng: _coordinates[coordinatesIndex][0]});
         }
         return coordinates;
       }
-      _getClientMarkerIcon(client) {
+      _getClientMarkerIcon(client, color) {
         // determine x coordinate in aircraft sprite image
         var client_x_sprite = parseInt(client.heading);
         if (client_x_sprite > 180) {
@@ -252,7 +252,7 @@
 
         // return actual image
         return {
-          url: '../aircraft-yellow-icons.png',
+          url: '../aircraft-' + color + '-icons.png',
           // This marker is 20 pixels wide by 32 pixels high.
           size: new google.maps.Size(23, 23),
           // The origin for this image is (0, 0).
@@ -329,7 +329,10 @@
         // calculate traveled distance in nautical miles
         // get time traveled
         var now = new Date();
-        var updated = new Date(Date.parse(client['_updated']));
+        if (!client['last_drawn']) {
+          client['last_drawn'] = client['_updated'];
+        }
+        var updated = new Date(Date.parse(client['last_drawn']));
         if (updated > now) {
           updated.setDate(updated.getDate() + 1);
         }
@@ -337,25 +340,27 @@
         var kmTraveled = (client.groundspeed * hoursTraveled) * 1.609344;
 
         // keep conservative
-        if (kmTraveled > 5) {
+        if (client['groundspeed'] > 40) {
           // calculate new location
           var currentLocation = new google.maps.LatLng(client['location'][1], client['location'][0]);
 
-          kmTraveled = kmTraveled / 6371;  
+          kmTraveled = kmTraveled / 6371;
           var heading = FsnMap.toRad(client.heading);
 
           var lat1 = FsnMap.toRad(currentLocation.lat()), lon1 = FsnMap.toRad(currentLocation.lng());
 
-          var lat2 = Math.asin(Math.sin(lat1) * Math.cos(kmTraveled) + 
+          var lat2 = Math.asin(Math.sin(lat1) * Math.cos(kmTraveled) +
                               Math.cos(lat1) * Math.sin(kmTraveled) * Math.cos(heading));
 
           var lon2 = lon1 + Math.atan2(Math.sin(heading) * Math.sin(kmTraveled) *
-                                       Math.cos(lat1), 
+                                       Math.cos(lat1),
                                        Math.cos(kmTraveled) - Math.sin(lat1) *
                                        Math.sin(lat2));
 
           client['location'][0] = FsnMap.toDeg(lon2);
           client['location'][1] = FsnMap.toDeg(lat2);
+
+          client['last_drawn'] = now;
         }
 
         return client
@@ -373,9 +378,9 @@
           var marker = this._aircraftMarkers[pilot.callsign + pilot.cid];
           var pilot = this._calculateClientMovement(pilot);
           if (marker != undefined) {
-            // update existing marker
+              // update existing marker
               marker.setPosition({lat: pilot['location'][1], lng: pilot['location'][0]});
-              marker.setIcon(this._getClientMarkerIcon(pilot));
+              marker.setIcon(this._getClientMarkerIcon(pilot, 'yellow'));
               // console.log("update " + marker);
           } else {
             // create and save a new marker
@@ -383,11 +388,10 @@
               position: {lat: pilot['location'][1], lng: pilot['location'][0]},
               map: this.$.map.map,
               label: pilot.route,
-              icon: this._getClientMarkerIcon(pilot),
               title: pilot.callsign + ' ' + pilot.realname
             });
+
             this._aircraftMarkers[pilot.callsign + pilot.cid] = marker;
-            // console.log("create " + marker);
           }
         }
       }
@@ -398,7 +402,6 @@
         }
 
         for (var atcIndex = 0, len = this._atcs._items.length; atcIndex < len; atcIndex++) {
-          console.log('ok');
           var atc = this._atcs._items[atcIndex];
           // console.log("atc #" + atcIndex);
 
