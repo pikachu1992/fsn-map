@@ -393,7 +393,8 @@
               position: {lat: pilot['location'][1], lng: pilot['location'][0]},
               map: this.$.map.map,
               label: pilot.route,
-              title: pilot.callsign + ' ' + pilot.realname
+              title: pilot.callsign + ' ' + pilot.realname,
+              zIndex: 0
             });
 
             this._aircraftMarkers[pilot.callsign + pilot.cid] = marker;

@@ -41,7 +41,8 @@ class atcClient {
             position: this.location,
             map: map,
             icon: '../airport-icon.png',
-            title: this.callsign + ' ' + this.realname
+            title: this.callsign + ' ' + this.realname,
+            zIndex: 10000 + this.__client['facilitytype']
           });
       } else {
         this.map_marker = null;
