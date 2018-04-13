@@ -439,7 +439,7 @@
         //console.log('{"location": {"$near":{ "$geometry": {"type": "Point", "coordinates": [' + center.lng() + ', ' + center.lat() + ']}, "$maxDistance": ' + Math.floor(distance) + '}}}');
         return  ['{ "$and": [ ',
                 [
-                  '{"clienttype": {"$eq": "' + clientType + '"}}',
+                  '{"clienttype": "' + clientType + '"}',
                   '{"location": {"$near":{"$geometry": {"type": "Point", "coordinates": [' + center.lng() + ', ' + center.lat() + ']}, "$maxDistance": ' + Math.floor(distance) + '}}}',
                   // TODO: append params here
                   //'{"callsign": {"$regex": "^(TAP|TSZ).*$", "$options": "im"}}',
