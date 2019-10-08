@@ -1,5 +1,5 @@
 {
-  "name": "fsn-map",
+  "name": "fsn-map-vatsim",
   "description": "Dynamic flight sim traffic map",
   "main": "fsn-map.html",
   "dependencies": {
