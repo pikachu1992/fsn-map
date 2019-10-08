@@ -24,7 +24,7 @@
 
     <iron-ajax
           id="ajax"
-          url="https://51.38.190.239:5001/clients"
+          url="http://51.38.190.239:5001/clients"
           handle-as="json"
           last-response="{{_pilots}}"
           on-response="_plotPilotMapMarkers"
@@ -32,7 +32,7 @@
 
     <iron-ajax
           id="atc"
-          url="https://51.38.190.239:5001/clients"
+          url="http://51.38.190.239:5001/clients"
           handle-as="json"
           last-response="{{_atcs}}"
           on-response="_handleAtcResponse"
