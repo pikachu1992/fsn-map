@@ -40,7 +40,7 @@ class atcClient {
           this.map_marker = new google.maps.Marker({
             position: this.location,
             map: map,
-            icon: '../bower_components/fsn-map-vatsim/airport-icon.png',
+            icon: '../images/airport-icon.png',
             title: this.callsign + ' ' + this.realname,
             zIndex: 10000 + this.__client['facilitytype']
           });
