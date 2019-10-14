@@ -24,7 +24,7 @@
 
     <iron-ajax
           id="ajax"
-          url="http://wwwapi.portugal-vacc.org:5001/clients"
+          url="http://vatsim-api.flyatlantic-va.com/clients"
           handle-as="json"
           last-response="{{_pilots}}"
           on-response="_plotPilotMapMarkers"
@@ -32,7 +32,7 @@
 
     <iron-ajax
           id="atc"
-          url="http://wwwapi.portugal-vacc.org:5001/clients"
+          url="http://vatsim-api.flyatlantic-va.com/clients"
           handle-as="json"
           last-response="{{_atcs}}"
           on-response="_handleAtcResponse"
