@@ -41,6 +41,15 @@
     <iron-ajax
           auto
           id="firs"
+          url="http://wwwapi.portugal-vacc.org/v1/get_online_firs"
+          handle-as="json"
+          last-response="{{firsOnline}}"
+          on-response="handleFirsOnline"
+          debounce-duration="3000"></iron-ajax>
+
+    <iron-ajax
+          auto
+          id="firsOnline"
           url="https://v4p4sz5ijk.execute-api.us-east-1.amazonaws.com/anbdata/airspaces/zones/fir-list"
           params='{"api_key":"2a877ab0-4ed2-11e7-9b2e-d3182793b831", "firs": "", "format": "json"}'
           handle-as="json"
@@ -450,6 +459,34 @@
         return {
           where: this._computeWhere(clientType),
           projection: '{"_id": 1, "_updated": 1, "_created": 1, "callsign": 1, "cid": 1, "clienttype": 1, "facilitytype": 1, "realname": 1, "location": 1, "heading": 1, "groundspeed": 1, "altitude": 1}'}
+      }
+
+      handleFirsOnline(){
+        var firs =  Object.values(this.firsOnline)[1]
+        firs.forEach(element => {
+          console.log(element)
+          if (element.geometry.type == "Polygon") {
+            var _coordinates = element.geometry.coordinates[0];
+          } else if (element.geometry.type == "MultiPolygon") {
+            var _coordinates = element.geometry.coordinates[0][1];
+          }
+          if (_coordinates != undefined) {
+            _coordinates.push(_coordinates[0])
+            var coordinates = this._getFirCoordinates(_coordinates);
+            var firsOnline = new google.maps.Polygon({
+              clickable: true,
+              path: coordinates,
+              geodesic: true,
+              strokeColor: "#ff2700",
+              strokeOpacity: 1,
+              strokeWeight: 2,
+              fillColor: '#ff2700',
+              fillOpacity: 0.2
+            });
+
+            firsOnline.setMap(this.$.map.map);
+          }
+        });
       }
     }
 
