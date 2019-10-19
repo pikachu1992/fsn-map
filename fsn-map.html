@@ -40,7 +40,7 @@
 
     <iron-ajax
           auto
-          id="firs"
+          id="firsOnline"
           url="http://wwwapi.portugal-vacc.org/v1/get_online_firs"
           handle-as="json"
           last-response="{{firsOnline}}"
@@ -49,7 +49,7 @@
 
     <iron-ajax
           auto
-          id="firsOnline"
+          id="firs"
           url="https://v4p4sz5ijk.execute-api.us-east-1.amazonaws.com/anbdata/airspaces/zones/fir-list"
           params='{"api_key":"2a877ab0-4ed2-11e7-9b2e-d3182793b831", "firs": "", "format": "json"}'
           handle-as="json"
@@ -207,7 +207,9 @@
             this.$.atc.generateRequest();
           }
         }
-
+        if (this._clientTimerTickCounter % 5000 == 0) {
+          this.$.firsOnline.generateRequest()
+        }
         // console.log("this._clientTimerTickCounter++;");
         this._clientTimerTickCounter++;
         window.requestAnimationFrame(this._clientTimerTick.bind(this));
