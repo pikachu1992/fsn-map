@@ -156,6 +156,10 @@
             type: Array,
             value: []
           },
+          FIRWindowInfos: {
+            type: Array,
+            value: []
+          },
           updating: {
             type: Boolean,
             value: false
@@ -401,20 +405,36 @@
               // update existing marker
               marker.setPosition({lat: pilot['location'][1], lng: pilot['location'][0]});
               marker.setIcon(this._getClientMarkerIcon(pilot, 'yellow'));
+              
               // console.log("update " + marker);
+             
           } else {
             // create and save a new marker
             marker = new google.maps.Marker({
               position: {lat: pilot['location'][1], lng: pilot['location'][0]},
               map: this.$.map.map,
               label: pilot.route,
-              title: pilot.callsign + ' ' + pilot.realname,
-              zIndex: 0
+              title: pilot.callsign + '<br>' + pilot.realname + '<br>' + pilot.planned_aircraft,
+              zIndex: Number(pilot.cid)
             });
-
+            
             this._aircraftMarkers[pilot.callsign + pilot.cid] = marker;
           }
         }
+        Object.values(this._aircraftMarkers).forEach(element => {
+          element['infowindow'] = new google.maps.InfoWindow({
+                content: element['title']
+            });
+            var thisMap = this.$.map.map
+            this.FIRWindowInfos.push(element['infowindow'])
+            var windowsInfos = this.FIRWindowInfos
+            google.maps.event.addListener(element, 'click', function () {
+              windowsInfos.forEach(element => {
+                  element.close()
+                    });
+              element['infowindow'].open(thisMap, this);
+            });
+        });
       }
       _handleAtcResponse() {
         if (this._atcs == undefined) {
@@ -463,7 +483,7 @@
       computeParams(clientType) {
         return {
           where: this._computeWhere(clientType),
-          projection: '{"_id": 1, "_updated": 1, "_created": 1, "callsign": 1, "cid": 1, "clienttype": 1, "facilitytype": 1, "realname": 1, "location": 1, "heading": 1, "groundspeed": 1, "altitude": 1}'}
+          projection: '{"_id": 1, "_updated": 1, "_created": 1, "callsign": 1, "cid": 1, "clienttype": 1, "facilitytype": 1, "realname": 1, "location": 1, "heading": 1, "groundspeed": 1, "altitude": 1, "planned_aircraft": 1}'}
       }
 
       handleFirsOnline(){
@@ -494,9 +514,32 @@
             });
 
             firsOnline.setMap(this.$.map.map);
+
+            var infowindow = new google.maps.InfoWindow({
+              content: element['properties']['callsign'] + '<br>' + element['properties']['frequency'] + '<br>' + element['properties']['name']
+            });
+            var mapp = this.$.map.map
+            this.FIRWindowInfos.push(infowindow)
+            var windowsInfos = this.FIRWindowInfos
+            google.maps.event.addListener(firsOnline, 'click', function (event) {
+                //alert the index of the polygon
+               
+                windowsInfos.forEach(element => {
+                  element.close()
+                    });
+                infowindow.setPosition(coordinates[0]);
+                infowindow.open(mapp);
+                
+            });
             this.onlinePolygons.push(firsOnline)
           }
         });
+        var windowsInfos = this.FIRWindowInfos
+        google.maps.event.addListener(this.$.map.map, 'click', function (event) {
+            windowsInfos.forEach(element => {
+              element.close()
+                });
+            });
       }
     }
 
