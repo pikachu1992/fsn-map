@@ -424,7 +424,6 @@
             atc_client = new atcClient(atc, this.$.map.map);
 
             this._atcClients[atc_client.id] = atc_client;
-            console.log(this._atcClients[atc_client.id]);
           }
         }
       }
@@ -464,7 +463,6 @@
       handleFirsOnline(){
         var firs =  Object.values(this.firsOnline)[1]
         firs.forEach(element => {
-          console.log(element)
           if (element.geometry.type == "Polygon") {
             var _coordinates = element.geometry.coordinates[0];
           } else if (element.geometry.type == "MultiPolygon") {
