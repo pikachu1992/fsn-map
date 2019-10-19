@@ -152,6 +152,10 @@
             type: String,
             value: ''
           },
+          onlinePolygons: {
+            type: Array,
+            value: []
+          },
           updating: {
             type: Boolean,
             value: false
@@ -464,6 +468,11 @@
 
       handleFirsOnline(){
         var firs =  Object.values(this.firsOnline)[1]
+        
+        this.onlinePolygons.forEach(element => {
+          element.setMap(null)
+        });
+        this.onlinePolygons = []
         firs.forEach(element => {
           if (element.geometry.type == "Polygon") {
             var _coordinates = element.geometry.coordinates[0];
@@ -485,6 +494,7 @@
             });
 
             firsOnline.setMap(this.$.map.map);
+            this.onlinePolygons.push(firsOnline)
           }
         });
       }
